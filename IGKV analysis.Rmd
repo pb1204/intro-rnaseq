@@ -1,0 +1,135 @@
+---
+title: "IGKV analysis"
+author: "Peliah Bowers"
+date: "2026-06-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# IGKV Gene Frequency Analysis
+
+This notebook demonstrates my analysis of IGKV gene frequencies using R. The dataset is not included due to internship policy. 
+
+'''{r}
+#load libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+
+# Manually ordered genes
+ordered_genes_manual <- c(
+  "IGKV2-137", "IGKV1-136", "IGKV1-135", "IGKV14-134-1", "IGKV17-134", "IGKV1-133", # 200
+  "IGKV1-132", "IGKV1-131", "IGKV14-130", "IGKV9-129", "IGKV9-128", "IGKV17-127","IGKV14-126-1", "IGKV14-126", "IGKV11-125", # 400
+  "IGKV9-124", "IGKV9-123", "IGKV1-122","IGKV17-121", "IGKV9-120", "IGKV9-119", "IGKV14-118-2", "IGKV14-118-1", "IGKV11-118","IGKV1-117", # 600
+  "IGKV2-116", "IGKV1-115", "IGKV11-114", "IGKV2-113", "IGKV2-112","IGKV14-111","IGKV1-110","IGKV2-109","IGKV1-108","IGKV2-107", # 800
+  "IGKV11-106","IGKV2-105","IGKV16-104","IGKV15-103","IGKV15-102","IGKV20-101-2","IGKV15-101-1","IGKV15-101","IGKV14-100", # 1000
+  "IGKV1-99","IGKV12-98","IGKV15-97","IGKV10-96","IGKV2-95-2","IGKV2-95-1","IGKV10-95","IGKV10-94","IGKV2-93-1","IGKV19-93",# 1200
+  "IGKV4-92","IGKV4-91","IGKV4-90","IGKV13-89-1","IGKV12-89","IGKV1-88","IGKV13-87","IGKV4-86","IGKV13-85","IGKV13-84",# 1400                   
+  "IGKV4-83","IGKV13-82","IGKV4-81","IGKV13-80-1","IGKV4-80","IGKV4-79","IGKV13-78-1","IGKV4-78","IGKV4-77","IGKV13-76",# 1600
+  "IGKV4-75","IGKV13-74-1","IGKV4-74","IGKV13-73-1","IGKV4-73","IGKV4-72","IGKV13-71-1","IGKV4-71","IGKV4-70","IGKV4-69","IGKV4-68","IGKV12-67","IGKV12-66","IGKV4-65", # 1800
+  "IGKV13-64","IGKV4-63","IGKV13-62-1","IGKV4-62","IGKV13-61-1","IGKV4-61","IGKV4-60","IGKV4-59","IGKV4-58", "IGKV13-57-2", # 2000
+  "IGKV4-57-1","IGKV13-57-1","IGKV4-57","IGKV13-56-1","IGKV4-56","IGKV13-55-1","IGKV4-55","IGKV13-54-1","IGKV4-54","IGKV4-53","IGKV4-52","IGKV4-51","IGKV4-50","IGKV12-49", # 2200
+  "IGKV5-48","IGKV12-47","IGKV12-46","IGKV5-45","IGKV12-44","IGKV5-43","IGKV12-42","IGKV12-41","IGKV5-40-1","IGKV12-40","IGKV5-39",# 2400
+  "IGKV12-38","IGKV5-37","IGKV18-36","IGKV1-35","IGKV8-34","IGKV7-33","IGKV6-32","IGKV8-31", # 2600
+  "IGKV8-30","IGKV6-29","IGKV8-28","IGKV8-27","IGKV8-26","IGKV6-25","IGKV8-24","IGKV8-23-1","IGKV6-23","IGKV8-22",# 2800
+  "IGKV8-21","IGKV6-20","IGKV8-19","IGKV8-18","IGKV6-17","IGKV8-16","IGKV6-15","IGKV6-14","IGKV6-13","IGKV3-12-1",# 3000
+  "IGKV3-12","IGKV3-11","IGKV3-10","IGKV3-9","IGKV3-8","IGKV3-7","IGKV3-6","IGKV3-5","IGKV3-4","IGKV3-3","IGKV3-2","IGKV3-1" # 3200
+)
+
+# Prepare data
+IGKV_training_data <- data %>%
+  mutate(
+    gene = as.character(gene),
+    gene = ifelse(is.na(gene), "NA", gene),
+    sample_id = as.character(sample_id),
+    RECALC_freq = ifelse(is.na(RECALC_freq), 0, RECALC_freq),
+    sample_id = ifelse(is.na(sample_id) | sample_id == "", "NA", sample_id)
+  )
+
+# Handle gene ordering
+all_genes <- unique(IGKV_training_data$gene)
+ordered_genes <- c(ordered_genes_manual, setdiff(all_genes, ordered_genes_manual))
+
+IGKV_training_data <- IGKV_training_data %>%
+  mutate(
+    gene = factor(gene, levels = ordered_genes, ordered = TRUE),
+    sample_id = factor(sample_id, levels = c("S1","S2","S3","S4","S5","S6","S7","S8","S9","S10","NA"))
+  )
+
+# Map sample_id to descriptive legend label
+legend_key <- c(
+  "S1"  = "PSCUSEQ25 M788 (AA4.1+IGM+)",
+  "S2"  = "PSCUSEQ26 M788 (AA4.1-IGM+IGD+)",
+  "S3"  = "PSCUSEQ27 R1215 (AA4.1+IGM+)",
+  "S4"  = "PSCUSEQ28 R1215 (AA4.1-IGM+IGD+)",
+  "S5"  = "PSCUSEQ29 R1215 Homo BCL2+ F252 (AA4.1- IgM+ IgD+)",
+  "S6"  = "PSCUSEQ30 R1215 Homo BCL2+ F252 (AA4.1+ IgM+)",
+  "S7"  = "PSCUSEQ31 WT BCL2+ F260 (AA4.1- IgM+ IgD+)",
+  "S8"  = "PSCUSEQ32 WT BCL2+ F260 (AA4.1+ IgM+)",
+  "S9"  = "PSCUSEQ33 WT R261 (AA4.1- IgM+ IgD+)",
+  "S10" = "PSCUSEQ34 WT R261 (AA4.1+ IgM+)"
+)
+
+IGKV_training_data <- IGKV_training_data %>%
+  mutate(
+    legend_label = ifelse(sample_id %in% names(legend_key),
+                          legend_key[sample_id],
+                          sample_id)
+  )
+
+# Set display order for the legend
+IGKV_training_data$legend_label <- factor(
+  IGKV_training_data$legend_label,
+  levels = c(
+    "PSCUSEQ25 M788 (AA4.1+IGM+)",
+    "PSCUSEQ26 M788 (AA4.1-IGM+IGD+)",
+    "PSCUSEQ27 R1215 (AA4.1+IGM+)",
+    "PSCUSEQ28 R1215 (AA4.1-IGM+IGD+)",
+    "PSCUSEQ30 R1215 Homo BCL2+ F252 (AA4.1+ IgM+)",
+    "PSCUSEQ29 R1215 Homo BCL2+ F252 (AA4.1- IgM+ IgD+)",
+    "PSCUSEQ32 WT BCL2+ F260 (AA4.1+ IgM+)",
+    "PSCUSEQ31 WT BCL2+ F260 (AA4.1- IgM+ IgD+)",
+    "PSCUSEQ34 WT R261 (AA4.1+ IgM+)",
+    "PSCUSEQ33 WT R261 (AA4.1- IgM+ IgD+)",
+    "NA"
+  )
+)
+
+# Define color palette
+color_map <- c(
+  "PSCUSEQ25 M788 (AA4.1+IGM+)" = "#052F61",
+  "PSCUSEQ26 M788 (AA4.1-IGM+IGD+)" = "#009292",
+  "PSCUSEQ27 R1215 (AA4.1+IGM+)" = "#FF6DB6",
+  "PSCUSEQ28 R1215 (AA4.1-IGM+IGD+)" = "#490092",
+  "PSCUSEQ30 R1215 Homo BCL2+ F252 (AA4.1+ IgM+)" = "#006DDB",
+  "PSCUSEQ29 R1215 Homo BCL2+ F252 (AA4.1- IgM+ IgD+)" = "#B66DFF",
+  "PSCUSEQ32 WT BCL2+ F260 (AA4.1+ IgM+)" = "#FFCC00",
+  "PSCUSEQ31 WT BCL2+ F260 (AA4.1- IgM+ IgD+)" = "#920000",
+  "PSCUSEQ34 WT R261 (AA4.1+ IgM+)" = "#FF420E",
+  "PSCUSEQ33 WT R261 (AA4.1- IgM+ IgD+)" = "#555555",
+  "NA" = "#24FF24"
+)
+
+# Create plot with updated legend
+ggplot(data = IGKV_training_data, aes(x = gene, y = RECALC_freq, fill = legend_label)) +
+  geom_bar(stat = "identity", position = "dodge", na.rm = TRUE) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, NA)) +
+  labs(title = "IGKV", x = "Gene", y = "Sequence Frequency") +
+  theme_classic(base_size = 6) +
+  theme(
+    axis.text.x = element_text(angle = 50, hjust = 1, size = 5, color = "black"),
+    axis.text.y = element_text(size = 8),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    plot.title = element_text(size = 12)
+  ) +
+  scale_fill_manual(values = color_map) +
+  guides(fill = guide_legend(title = "Legend"))
+'''
+
+
+
+
